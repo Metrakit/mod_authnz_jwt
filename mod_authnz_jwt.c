@@ -165,7 +165,7 @@ static char** token_get_claim_array_of_string(request_rec* r, jwt_t *token, cons
 static json_t* token_get_claim_array(request_rec* r, jwt_t *token, const char* claim);
 static json_t* token_get_claim_json(request_rec* r, jwt_t *token, const char* claim);
 static const char* token_get_alg(jwt_t *jwt);
-static char *getJWTCookie(request_rec *r);
+static char *getJWTFromQueryString(request_rec *r);
 
 
 
@@ -250,28 +250,9 @@ static void *create_auth_jwt_config(apr_pool_t * p, server_rec *s){
 
 
 
-static char* getJWTCookie(request_rec *r) {
-
-	char *cookieName = "jwt_token";
-	char *cookie, *tokenizerCtx, *jwt = NULL;
-	char *cookies = apr_pstrdup(r->pool, (char *) apr_table_get(r->headers_in, "Cookie"));
-
-	if(cookies != NULL) {
-		cookie = apr_strtok(cookies, ";", &tokenizerCtx);
-
-		while (cookie != NULL) {
-			while (*cookie == ' ') {
-				cookie++;
-			}
-			if (strncmp(cookie, cookieName, strlen(cookieName)) == 0) {
-				cookie += (strlen(cookieName)+1);
-				jwt = apr_pstrdup(r->pool, cookie);
-				break;
-			}
-			cookie = apr_strtok(NULL, ";", &tokenizerCtx);
-		}
-	}
-
+static char* getJWTFromQueryString(request_rec *r) {
+	char* jwt = r->args;
+    memmove(jwt, jwt+4, strlen(jwt));
 	return jwt;
 }
 
@@ -989,9 +970,9 @@ static int auth_jwt_authn_with_token(request_rec *r){
 		return HTTP_INTERNAL_SERVER_ERROR;
 	}
 
-    // Fallback to jwt_token cookie if no header
+    // Fallback to jwt_token query string if no header
 	if(!authorization_header){
-		token_str = getJWTCookie(r);
+		token_str = getJWTFromQueryString(r);
 	} else {
 		int header_len = strlen(authorization_header);
 		if(header_len > 7 && !strncmp(authorization_header, "Bearer ", 7)){
